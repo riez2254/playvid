@@ -5,12 +5,10 @@ export default {
     const id = url.searchParams.get("id");
     const type = url.searchParams.get("type") || "dash";
 
-    // Redirect root ke play.mpd
     if (pathname === "/" && id) {
       return Response.redirect(`${url.origin}/play.mpd?id=${id}&type=${type}`, 302);
     }
 
-    // Endpoint utama
     if (pathname === "/play.mpd" && id) {
       const apiUrl = `https://api.vidio.com/livestreamings/${id}/stream?initialize=true`;
 
@@ -30,15 +28,32 @@ export default {
       };
 
       const response = await fetch(apiUrl, { headers });
-      const data = await response.text();
+      const text = await response.text();
 
-      // Ambil URL MPD dari JSON
-      const mpdUrl = getBetween(data, `"${type}":"`, `"`);
-      if (!mpdUrl) {
-        return new Response("MPD URL tidak ditemukan", { status: 404 });
+      // Coba parse JSON
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        return new Response("Gagal parse JSON: " + e.message, { status: 500 });
       }
 
-      // Redirect ke URL MPD sebenarnya
+      // Ambil link MPD dari beberapa kemungkinan field
+      let mpdUrl =
+        json?.data?.sources?.dash ||
+        json?.data?.sources?.drm_stream_dash_url ||
+        json?.data?.drm_stream_dash_url ||
+        json?.data?.dash ||
+        getBetween(text, '"dash":"', '"') ||
+        getBetween(text, '"drm_stream_dash_url":"', '"');
+
+      if (!mpdUrl) {
+        return new Response("MPD URL tidak ditemukan\n\n" + text, {
+          status: 404,
+          headers: { "content-type": "text/plain" },
+        });
+      }
+
       return Response.redirect(mpdUrl, 302);
     }
 
@@ -46,10 +61,9 @@ export default {
   },
 };
 
-// Fungsi ekstraksi string
 function getBetween(str, start, end) {
-  const startIndex = str.indexOf(start);
-  if (startIndex === -1) return "";
-  const endIndex = str.indexOf(end, startIndex + start.length);
-  return endIndex === -1 ? "" : str.substring(startIndex + start.length, endIndex);
+  const s = str.indexOf(start);
+  if (s === -1) return "";
+  const e = str.indexOf(end, s + start.length);
+  return e === -1 ? "" : str.substring(s + start.length, e);
 }
