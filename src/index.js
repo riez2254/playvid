@@ -3,13 +3,17 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
     const id = url.searchParams.get("id");
+    const type = url.searchParams.get("type") || "dash";
 
+    // Redirect root ke play.mpd
     if (pathname === "/" && id) {
-      return Response.redirect(`${url.origin}/play.mpd?id=${id}`, 302);
+      return Response.redirect(`${url.origin}/play.mpd?id=${id}&type=${type}`, 302);
     }
 
+    // Endpoint utama
     if (pathname === "/play.mpd" && id) {
       const apiUrl = `https://api.vidio.com/livestreamings/${id}/stream?initialize=true`;
+
       const headers = {
         "User-Agent": "tv-android/2.42.6 (704)",
         "x-client": "1754045001",
@@ -22,21 +26,30 @@ export default {
         "x-user-email": "salmahayuk@gmail.com",
         "x-user-token": "xevCH8Aj5SRJDBN6k5Ym",
         "x-visitor-id": "41c88d80-185f-45ad-ab95-f06002f9fef8",
-        "content-type": "application/vnd.api+json"
+        "content-type": "application/vnd.api+json",
       };
 
       const response = await fetch(apiUrl, { headers });
-      const text = await response.text();
-      const match = text.match(/https:[^"]+\.mpd/);
-      const dashUrl = match ? match[0].replace(/\\/g, "") : null;
+      const data = await response.text();
 
-      if (!dashUrl) {
-        return new Response("MPD URL not found", { status: 404 });
+      // Ambil URL MPD dari JSON
+      const mpdUrl = getBetween(data, `"${type}":"`, `"`);
+      if (!mpdUrl) {
+        return new Response("MPD URL tidak ditemukan", { status: 404 });
       }
 
-      return Response.redirect(dashUrl, 302);
+      // Redirect ke URL MPD sebenarnya
+      return Response.redirect(mpdUrl, 302);
     }
 
-    return new Response("Invalid request", { status: 400 });
+    return new Response("Gunakan format ?id=xxxx&type=dash", { status: 400 });
   },
 };
+
+// Fungsi ekstraksi string
+function getBetween(str, start, end) {
+  const startIndex = str.indexOf(start);
+  if (startIndex === -1) return "";
+  const endIndex = str.indexOf(end, startIndex + start.length);
+  return endIndex === -1 ? "" : str.substring(startIndex + start.length, endIndex);
+}
