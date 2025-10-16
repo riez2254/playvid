@@ -26,24 +26,16 @@ export default {
       };
 
       const response = await fetch(apiUrl, { headers });
-      const text = await response.text();
-      const dashUrl = getBetween(text, '"dash":"', '"');
+      const data = await response.json();
+      const dashUrl = data?.data?.sources?.dash;
 
       if (!dashUrl) {
         return new Response("MPD URL not found", { status: 404 });
       }
 
-      return Response.redirect(dashUrl, 302);
+      return Response.redirect(dashUrl.replace(/\\/g, ""), 302);
     }
 
     return new Response("Invalid request", { status: 400 });
   },
 };
-
-function getBetween(str, start, end) {
-  const ini = str.indexOf(start);
-  if (ini === -1) return "";
-  const ini2 = ini + start.length;
-  const len = str.indexOf(end, ini2) - ini2;
-  return str.substring(ini2, ini2 + len);
-}
