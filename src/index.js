@@ -26,14 +26,15 @@ export default {
       };
 
       const response = await fetch(apiUrl, { headers });
-      const data = await response.json();
-      const dashUrl = data?.data?.sources?.dash;
+      const text = await response.text();
+      const match = text.match(/https:[^"]+\.mpd/);
+      const dashUrl = match ? match[0].replace(/\\/g, "") : null;
 
       if (!dashUrl) {
         return new Response("MPD URL not found", { status: 404 });
       }
 
-      return Response.redirect(dashUrl.replace(/\\/g, ""), 302);
+      return Response.redirect(dashUrl, 302);
     }
 
     return new Response("Invalid request", { status: 400 });
